@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js experiment - game of life - shaders</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				background-color: #000000;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#container {
+				height: 100%;
+				width: 100%;
+				text-align:center;
+			}
+			canvas {
+				display: inline;
+			}
+		</style>
+	</head>
+    <div id='container'></div>
+	<body>
+		<script src="js/three.js"></script>
+    <script id="vertexShader" type="x-shader/x-vertex">
+      uniform mat4 modelViewMatrix;
+      uniform mat4 projectionMatrix;
+      attribute vec3 position;
+
+      void main() {
+      	gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+      }
+    </script>
+    <script id="fragmentShader" type="x-shader/x-fragment">
+			precision mediump float;
+
+			uniform vec2 textureSize; //The width and height of our screen
+			uniform sampler2D bufferTexture; //Our input texture
+			uniform float param;
+
+			void main() {
+				vec2 pt = gl_FragCoord.xy;
+				vec4 C = texture2D( bufferTexture, vec2( pt.x/textureSize.x, pt.y/textureSize.y ) );
+
+				float cx = pt.x/textureSize.x;
+
+				float left = cx - 1.0/textureSize.x;
+				if (left < 0.0) { left = 1.0; }
+				float right = cx + 1.0/textureSize.x;
+				if (left > 1.0) { left = 0.0; }
+
+				float cy = pt.y/textureSize.y;
+				float down = cy - 1.0/textureSize.y;
+				if (down < 0.0) { down = 1.0; }
+				float up = cy + 1.0/textureSize.y;
+				if (up > 1.0) { up = 0.0; }
+
+				vec4 arr[8];
+
+				arr[0] = texture2D( bufferTexture, vec2( cx   , up ));   //N
+				arr[1] = texture2D( bufferTexture, vec2( right, up ));   //NE
+				arr[2] = texture2D( bufferTexture, vec2( right, cy ));   //E
+				arr[3] = texture2D( bufferTexture, vec2( right, down )); //SE
+				arr[4] = texture2D( bufferTexture, vec2( cx   , down )); //S
+				arr[5] = texture2D( bufferTexture, vec2( left , down )); //SW
+				arr[6] = texture2D( bufferTexture, vec2( left , cy ));   //W
+				arr[7] = texture2D( bufferTexture, vec2( left , up ));   //NW
+
+				int cnt = 0;
+				for(int i=0;i<8;i++){
+					if (arr[i].r > 0.5) {
+						cnt++;
+					}
+				}
+
+				if (C.r >= 0.5) { //cell is alive
+					if (cnt == 2 || cnt == 3) {
+						//Any live cell with two or three live neighbours lives on to the next generation.
+						gl_FragColor = vec4(0.51, 0.75, 1.0 * param, 1.0);
+					} else {
+						//Any live cell with fewer than two live neighbours dies, as if caused by underpopulation.
+						//Any live cell with more than three live neighbours dies, as if by overpopulation.
+						gl_FragColor = vec4(0.0,0.0,0.0,1.0);
+					}
+				} else { //cell is dead
+					if (cnt ==3) {
+						//Any dead cell with exactly three live neighbours becomes a live cell, as if by reproduction.
+						gl_FragColor = vec4(0.51, 0, 1.0 * param, 1.0);
+					} else {
+						gl_FragColor = vec4(0.0,0.0,0.0,1.0);
+					}
+				}
+			}
+		</script>
+    <script>
+      var container;
+      var camera, scene, renderer;
+			var geometry, material, mesh, mesh2;
+			var planeWidth, planeHeight;
+			var cubeSize = 5;
+
+			var bgRenderScene, bgMesh, bgMaterial;
+			var framebufferParams = { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter};
+			var frameBuffer_A, frameBuffer_B;
+			var frameBuffer, frameCounter = 0;
+
+			var colorChange = 1;
+
+			init();
+			render();
+
+			function init() {
+				var width = window.innerWidth;
+				var height = window.innerHeight;
+				planeWidth = width / 2;
+				planeHeight = planeWidth;
+
+        container = document.getElementById('container');
+				camera = new THREE.PerspectiveCamera( 50, width / height, 1, 1000 );
+				camera.position.set( 0, 0, 10 );
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0x000000 );
+
+				renderer = new THREE.WebGLRenderer();
+				renderer.setSize( width, height );
+
+				container.appendChild( renderer.domElement );
+
+				// create rendering (background scene)
+				var bgGeometry = new THREE.PlaneBufferGeometry( width, height );
+				var planeTexture = generateTexture(planeWidth, planeHeight);
+
+				bgMaterial = new THREE.RawShaderMaterial( {
+						uniforms: {
+							bufferTexture: { type: "t", value: planeTexture },
+							textureSize : {type: "v2", value: new THREE.Vector2( planeWidth, planeHeight )},
+						  param: {type: 'f', value: 1.0 }
+						},
+						vertexShader: document.getElementById( 'vertexShader' ).textContent,
+						fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+				} );
+
+				// these go to background scene for rendering into framebuffer
+				bgRenderScene = new THREE.Scene();
+				bgMesh = new THREE.Mesh( bgGeometry, bgMaterial );
+				bgRenderScene.add(bgMesh);
+
+				frameBuffer_A = new THREE.WebGLRenderTarget( planeWidth, planeHeight, framebufferParams);
+				frameBuffer_B = new THREE.WebGLRenderTarget( planeWidth, planeHeight, framebufferParams);
+
+				// create main scene
+				geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+				mesh = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial({map: frameBuffer_A.texture}) );
+				geometry.translate(- cubeSize / 2.0 - 1, 0, 0);
+
+				var geometry2 = new THREE.SphereGeometry(cubeSize / 2.0, 32, 32);
+				geometry2.translate(cubeSize / 2.0 + 1, 0, 0);
+				mesh2 = new THREE.Mesh( geometry2, new THREE.MeshBasicMaterial({map: frameBuffer_B.texture}) );
+
+				scene.add( mesh );
+				scene.add( mesh2 );
+			}
+
+			function render() {
+				requestAnimationFrame( render );
+
+				refreshFrameBuffer();
+				renderer.render( bgRenderScene, camera, frameBuffer );
+
+				bgMaterial.uniforms.bufferTexture.value = frameBuffer.texture;
+				bgMaterial.uniforms.param.value += 0.005 * colorChange;
+				if (bgMaterial.uniforms.param.value >= 1) {
+					colorChange = -1;
+				} else if (bgMaterial.uniforms.param.value <= 0.7) {
+					colorChange = 1
+				}
+
+				renderer.render( scene, camera );
+				mesh.rotation.y += 0.005;
+				mesh.rotation.x += 0.005;
+				mesh2.rotation.y -= 0.005;
+				mesh2.rotation.x -= 0.005;
+			}
+
+			function refreshFrameBuffer() {
+				if (frameCounter == 0) {
+					frameBuffer = frameBuffer_A;
+					frameCounter = 1;
+				} else {
+					frameBuffer = frameBuffer_B;
+					frameCounter = 0;
+				}
+			}
+
+			function generateTexture(x, y) {
+				var size = x * y;
+				var data = new Uint8Array( 4 * size );
+				var granularity = 0.15;
+
+				for ( var i = 0; i < size; i++ ) {
+					var stride = i * 4;
+					var color = 0;
+					if (Math.random() < granularity) {
+						color = 255;
+					}
+					data[ stride ] = color;
+					data[ stride + 1 ] = color;
+					data[ stride + 2 ] = color;
+					data[ stride + 3 ] = 255;	 // alpha
+				}
+
+				var texture = new THREE.DataTexture( data, x, y, THREE.RGBAFormat );
+				texture.needsUpdate = true;
+
+				return texture;
+			}
+  	</script>
+	</body>
+</html>
