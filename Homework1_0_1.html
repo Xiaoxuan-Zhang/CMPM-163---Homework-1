@@ -275,7 +275,7 @@
 
 				uniforms2 = {
 					time: { value: 1.0 },
-					texture: { value: new THREE.TextureLoader().load( 'pic/disturb.jpg' ) }
+					texture: { value: new THREE.TextureLoader().load( './pic/disturb.jpg' ) }
 				};
 				uniforms2.texture.value.wrapS = uniforms2.texture.value.wrapT = THREE.RepeatWrapping;
 
@@ -290,7 +290,7 @@
 					//scene.add( mesh );
 
 //Wood Box
-				var texture_img = THREE.ImageUtils.loadTexture('pic/1_store.jpg');
+				var texture_img = THREE.ImageUtils.loadTexture('./pic/1_store.jpg');
 				var mesh_box = new THREE.CubeGeometry(2.5,2.5,2.5);
         texture_box = new THREE.MeshFaceMaterial([
           new THREE.MeshBasicMaterial({ map: texture_img }),
@@ -310,7 +310,7 @@
 
 				loader = new THREE.BufferGeometryLoader();
 				//var colladaLoader = new THREE.ColladaLoader();
-				loader.load("/model/Seahorse.json", function (geo) { //stones.json
+				loader.load("./model/Seahorse.json", function (geo) { //stones.json
 							//mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({color:0x808080}));
 							stones = new THREE.Mesh(geo, material_stone);
 							stones.position = new THREE.Vector3(window.innerWidth/2.0, window.innerHeight/2.0, 0);
@@ -327,7 +327,7 @@
 //tree
 				loader = new THREE.BufferGeometryLoader();
 				//var colladaLoader = new THREE.ColladaLoader();
-				loader.load("/model/BlenderNatureAsset.json", function (geo) {
+				loader.load("./model/BlenderNatureAsset.json", function (geo) {
 							//mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({color:0x808080}));
 
 							tree = new THREE.Mesh(geo, material_tree);
