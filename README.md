@@ -1,6 +1,7 @@
 # CMPM-163 Homework
 
 Description:
+
 Homework1_0_1 is a 3D scene that contains 3 objects: one wooden box with texture, one low-poly christmas tree with Phong shader with one light source, and one seahorse with customized color effect. You can rotate them by drag the mouse. 
 
 Homework1_1 is an image process demo using emboss kernel. You can interact with it by moving the mouse from left to right or reversely.
